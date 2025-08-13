@@ -21,13 +21,13 @@ export VAULT_TOKEN="<Vault Root Token>"   # root for quick demos
 ### 1) Web service with Consul service checks
 
 ```bash
-nomad job run web.nomad
+nomad job run demos/web.nomad
 # Validate via Consul health API:
 curl -s "http://127.0.0.1:8500/v1/health/service/web?passing" \
   -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" | grep '"Service":'
 ```
 
-Tip: Edit `web.nomad` to change the command (e.g., print `v2`) and `nomad job run web.nomad` to watch a rolling update.
+Tip: Edit `web.nomad` to change the command (e.g., print `v2`) and `nomad job run demos/web.nomad` to watch a rolling update.
 
 ### 2) Consul KV → env templating with restart-on-change
 
@@ -37,7 +37,7 @@ Seed KV and run:
 curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
   --data 'Hello Nomad!' http://127.0.0.1:8500/v1/kv/app/message
 
-nomad job run kv-watcher.nomad
+nomad job run demos/kv-watcher.nomad
 ```
 
 Change the value and watch the task restart with the new env:
@@ -50,7 +50,7 @@ curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
 ### 3) Vault Workload Identity token injection
 
 ```bash
-nomad job run vault-token.nomad
+nomad job run demos/vault-token.nomad
 nomad alloc logs -stderr -job vault-token
 ```
 
@@ -59,7 +59,7 @@ The task reveals a short-lived Vault token and calls `auth/token/lookup-self` to
 ### 4) Periodic batch job (cron)
 
 ```bash
-nomad job run cron-hello.nomad
+nomad job run demos/cron-hello.nomad
 nomad job history cron-hello
 ```
 

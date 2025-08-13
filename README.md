@@ -2,7 +2,7 @@
 
 A single-file script to launch a local **Nomad**, **Consul**, and **Vault** dev stack with sensible defaults, version prompts, and robust health checks. Designed to be macOS-friendly (Bash 3.2 compatible) and also works on Linux (amd64/arm64).
 
-> **Script:** `muy_refactor.sh`
+> **Script:** `ncv-dev.sh`
 
 ---
 
@@ -33,10 +33,10 @@ A single-file script to launch a local **Nomad**, **Consul**, and **Vault** dev 
 
 ```bash
 # 1) Make it executable
-chmod +x ./muy_refactor.sh
+chmod +x ./ncv-dev.sh
 
 # 2) Run interactively (you'll be prompted for versions)
-./muy_refactor.sh
+./ncv-dev.sh
 ```
 
 When finished, the script prints tokens and the temp working directory and then cleans up processes and files.
@@ -72,17 +72,17 @@ Examples:
 
 ```bash
 # Non-interactive with explicit versions and URL validation
-./muy_refactor.sh --non-interactive --check \
+./ncv-dev.sh --non-interactive --check \
   --nomad 1.10.0 --consul 1.21.0 --vault 1.19.3
 
 # Stream logs during startup
-./muy_refactor.sh --stream-logs
+./ncv-dev.sh --stream-logs
 
 # Skip the example job
-./muy_refactor.sh --no-example
+./ncv-dev.sh --no-example
 
 # Use environment variables instead of flags
-NOMAD_VERSION=1.10.0 CONSUL_VERSION=1.21.0 VAULT_VERSION=1.19.3 ./muy_refactor.sh
+NOMAD_VERSION=1.10.0 CONSUL_VERSION=1.21.0 VAULT_VERSION=1.19.3 ./ncv-dev.sh
 ```
 
 ---
@@ -124,7 +124,7 @@ The script tail-dumps `consul.log`, `vault.log`, and `nomad.log` if a service fa
 ```
 .
 ├── README.md
-└── muy_refactor.sh
+└── ncv-dev.sh
 ```
 
 Optional: add a simple `.gitignore`
@@ -142,7 +142,7 @@ Run basic linting with ShellCheck (locally):
 
 ```bash
 brew install shellcheck  # macOS (or use your package manager)
-shellcheck muy_refactor.sh
+shellcheck ncv-dev.sh
 ```
 
 GitHub Actions workflow (optional):
@@ -158,7 +158,7 @@ jobs:
       - name: Install ShellCheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Lint
-        run: shellcheck muy_refactor.sh
+        run: shellcheck ncv-dev.sh
 ```
 
 ---

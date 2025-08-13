@@ -1,174 +1,70 @@
-# Nomad + Consul + Vault Dev Stack (macOS/Linux)
-
-A single-file script to launch a local **Nomad**, **Consul**, and **Vault** dev stack with sensible defaults, version prompts, and robust health checks. Designed to be macOS-friendly (Bash 3.2 compatible) and also works on Linux (amd64/arm64).
-
-> **Script:** `ncv-dev.sh`
+# Demos
 
 ---
 
-## ✨ Features
+## 🧪 Use-Case Demos
 
-- Choose versions via **flags** or **env vars**; prompts interactively if unset
-- `--check` preflight validation of release URLs
-- `--stream-logs` to see startup progress live
-- `--no-example` to skip the sample Nomad job
-- Finite health waits with log tails (no silent hangs)
-- Vault configured with `api_addr` / `cluster_addr` to avoid HA standby issues
-- Cleanup that kills child processes and removes the temp dir reliably
+### Environment setup (new terminal)
 
----
-
-## ⚙️ Requirements
-
-- macOS or Linux (x86_64 / arm64)
-- `curl` and `unzip` available in `PATH`
-  - Linux: `sudo apt-get install -y curl unzip` (Debian/Ubuntu) or `sudo yum install -y curl unzip` (RHEL/CentOS)
-- Internet access to download HashiCorp releases
-
-> The script downloads **Nomad**, **Consul**, and **Vault** locally into a temporary directory and does not alter system installs.
-
----
-
-## 🚀 Quick Start
+Export addresses and tokens printed by the launcher script:
 
 ```bash
-# 1) Make it executable
-chmod +x ./ncv-dev.sh
-
-# 2) Run interactively (you'll be prompted for versions)
-./ncv-dev.sh
+export NOMAD_ADDR="http://127.0.0.1:4646"
+export VAULT_ADDR="http://127.0.0.1:8200"
+export NOMAD_TOKEN="<Nomad Bootstrap Token>"
+export CONSUL_HTTP_TOKEN="<Consul Bootstrap Token>"
+export VAULT_TOKEN="<Vault Root Token>"   # root for quick demos
 ```
 
-When finished, the script prints tokens and the temp working directory and then cleans up processes and files.
+> The example jobs use the `raw_exec` driver, which is enabled in Nomad dev mode.
 
----
-
-## 🔧 Flags
-
-```text
---nomad X.Y.Z        Pin Nomad version
---consul X.Y.Z       Pin Consul version
---vault X.Y.Z        Pin Vault version
---non-interactive    Fail if any version is missing (no prompts)
---check              Validate release URLs before downloading
---stream-logs        Stream Consul/Vault/Nomad logs during waits
---no-example         Skip creating/running the example Nomad job
--h, --help           Show usage
-```
-
-### Environment variables
-
-You can also provide versions via env vars (flags take precedence):
-
-- `NOMAD_VERSION` (default `1.10.0`)
-- `CONSUL_VERSION` (default `1.21.0`)
-- `VAULT_VERSION` (default `1.19.3`)
-
-Control health check timeout via:
-
-- `HEALTH_TIMEOUT` (seconds, default `90`)
-
-Examples:
+### 1) Web service with Consul service checks
 
 ```bash
-# Non-interactive with explicit versions and URL validation
-./ncv-dev.sh --non-interactive --check \
-  --nomad 1.10.0 --consul 1.21.0 --vault 1.19.3
-
-# Stream logs during startup
-./ncv-dev.sh --stream-logs
-
-# Skip the example job
-./ncv-dev.sh --no-example
-
-# Use environment variables instead of flags
-NOMAD_VERSION=1.10.0 CONSUL_VERSION=1.21.0 VAULT_VERSION=1.19.3 ./ncv-dev.sh
+nomad job run web.nomad
+# Validate via Consul health API:
+curl -s "http://127.0.0.1:8500/v1/health/service/web?passing" \
+  -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" | grep '"Service":'
 ```
 
----
+Tip: Edit `web.nomad` to change the command (e.g., print `v2`) and `nomad job run web.nomad` to watch a rolling update.
 
-## 🧠 What the script does
+### 2) Consul KV → env templating with restart-on-change
 
-1. Detects OS/arch and downloads HashiCorp zip releases for Nomad, Consul, and Vault.
-2. Starts a **Consul dev agent** with ACLs enabled and bootstraps a management token.
-3. Starts **Vault** backed by Consul storage; initializes, unseals, and sets `api_addr/cluster_addr`.
-4. Starts **Nomad** with ACLs and Vault Workload Identity integration; bootstraps a management token.
-5. *(Optional)* Runs a simple **example** job using the `raw_exec` driver and tails its logs.
-6. Prints useful tokens (Vault root/unseal, Consul bootstrap, Nomad bootstrap) and the temp directory path.
-7. On exit, force-stops processes and removes the temp directory.
-
-> **Security note:** Tokens are printed to your terminal for convenience. Treat them as secrets and **do not commit** them anywhere.
-
----
-
-## 🧪 Example Output
-
-- Nomad Web UI: `http://127.0.0.1:4646/ui`
-- Example job: `Jobs → example` (if not skipped with `--no-example`)
-
-The script tail-dumps `consul.log`, `vault.log`, and `nomad.log` if a service fails to become healthy within the timeout.
-
----
-
-## 🐞 Troubleshooting
-
-- **Port conflicts**: Ensure nothing else is listening on `:8500` (Consul), `:8200` (Vault), or `:4646` (Nomad).  
-- **HCL parse errors**: The script writes multi-line HCL without semicolons. If you edit configs, avoid `;` in HCL2.  
-- **Cleanup hangs**: The script now renames the temp dir and deletes it asynchronously to avoid Finder/indexing blocks.  
-- **Vault standby/HA**: The script sets `api_addr` and `cluster_addr` to keep Vault responsive for local dev use.
-
----
-
-## 📦 Repository Layout
-
-```
-.
-├── README.md
-└── ncv-dev.sh
-```
-
-Optional: add a simple `.gitignore`
-
-```
-.DS_Store
-*.log
-```
-
----
-
-## 🧰 Dev & CI Tips
-
-Run basic linting with ShellCheck (locally):
+Seed KV and run:
 
 ```bash
-brew install shellcheck  # macOS (or use your package manager)
-shellcheck ncv-dev.sh
+curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
+  --data 'Hello Nomad!' http://127.0.0.1:8500/v1/kv/app/message
+
+nomad job run kv-watcher.nomad
 ```
 
-GitHub Actions workflow (optional):
+Change the value and watch the task restart with the new env:
 
-```yaml
-name: shellcheck
-on: [push, pull_request]
-jobs:
-  shellcheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - name: Lint
-        run: shellcheck ncv-dev.sh
+```bash
+curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
+  --data 'Hello *again* 👋' http://127.0.0.1:8500/v1/kv/app/message
 ```
 
----
+### 3) Vault Workload Identity token injection
 
-## 🔒 Disclaimer
+```bash
+nomad job run vault-token.nomad
+nomad alloc logs -stderr -job vault-token
+```
 
-This is intended for **local development** only. It prints sensitive tokens to your terminal and runs Vault/Consul/Nomad in dev modes. Do not use these defaults in production.
+The task reveals a short-lived Vault token and calls `auth/token/lookup-self` to prove it.
 
----
+### 4) Periodic batch job (cron)
 
-## 📜 License
+```bash
+nomad job run cron-hello.nomad
+nomad job history cron-hello
+```
 
-MIT (or choose your preferred license).
+### Cleanup
+
+```bash
+nomad job stop -purge web kv-watcher vault-token cron-hello
+```

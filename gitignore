@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & zips
+*.log
+*.zip
+
+# Editors
+.vscode/
+.idea/
+
+# Temp dirs
+tmp/
+temp/
+*.tmp
+
+# Script artifacts (safety; the script uses a temp dir under /tmp)
+*.deleting.*

@@ -121,36 +121,50 @@ nomad job status web
 
 ### 2) Consul KV → env templating with restart-on-change
 
-Seed and run:
+Seed KV and run:
+
 ```bash
 curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
   --data 'Hello Nomad!' http://127.0.0.1:8500/v1/kv/app/message
 
 nomad job run demos/kv-watcher.nomad
 ```
+Verify the value:
 
-#### Validation
 ```bash
-# KV value
 curl -s -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
-  http://127.0.0.1:8500/v1/kv/app/message?raw
+  http://127.0.0.1:8500/v1/kv/app/message\?raw
+```
 
-# Running alloc
-ALLOC=$(nomad job allocs -json kv-watcher \
-  | jq -r 'map(select(.ClientStatus=="running")) | .[0].ID'); echo "$ALLOC"
+Change the value and watch the task restart with the new env:
 
-# Restart count from task events
+```bash
+curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
+  --data 'Hello *again*' http://127.0.0.1:8500/v1/kv/app/message
+```
+
+Verify the value:
+
+```bash
+curl -s -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
+  http://127.0.0.1:8500/v1/kv/app/message\?raw
+```
+
+Recent events (last 10, all types)
+```bash
 nomad alloc status -json "$ALLOC" \
-  | jq '[.TaskStates["watcher"].Events[] | select(.Type=="Restarting")] | length'
+  | jq -r '(.TaskStates | to_entries | .[0].key) as $t
+           | .TaskStates[$t].Events
+           | .[-10:][]                      # last 10
+           | "\(.Time)  \(.Type)  \(.Message)"'
+```
 
-# Recent restart-related events
+(Optional) Only restart-related events
+```bash
 nomad alloc status -json "$ALLOC" \
   | jq -r '.TaskStates["watcher"].Events[]
            | select(.Type=="Restart Signaled" or .Type=="Restarting")
            | "\(.Time)  \(.Type)  \(.Message)"' | tail -n 10
-
-# Rendered env inside the alloc
-nomad alloc fs cat "$ALLOC" local/env
 ```
 
 ### 3) Vault Workload Identity: token injection

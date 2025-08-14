@@ -6,7 +6,6 @@ job "web" {
 
     network {
       port "http" {
-        to = 8080
       }
     }
 
@@ -25,7 +24,7 @@ job "web" {
       driver = "raw_exec"
       config {
         command = "bash"
-        args    = ["-c", "python3 -m http.server 8080"]
+        args    = ["-c", "echo v1 > index.html && python3 -m http.server ${NOMAD_PORT_http}"]
       }
       resources {
         cpu    = 100

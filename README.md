@@ -27,7 +27,58 @@ curl -s "http://127.0.0.1:8500/v1/health/service/web?passing" \
   -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" | grep '"Service":'
 ```
 
-Tip: Edit `web.nomad` to change the command (e.g., print `v2`) and `nomad job run demos/web.nomad` to watch a rolling update.
+### 🚦 Rolling update (v1 → v2)
+
+The `web` job serves a tiny page via Python’s HTTP server. To demo a rolling update, we’ll change the page contents from **v1** to **v2** and resubmit the job.
+
+1) **Edit** `demos/web.nomad` — change the task’s command from `v1` to `v2`:
+
+```diff
+ task "server" {
+   driver = "raw_exec"
+   config {
+     command = "bash"
+-    args    = ["-c", "echo v1 > index.html && python3 -m http.server ${NOMAD_PORT_http}"]
++    args    = ["-c", "echo v2 > index.html && python3 -m http.server ${NOMAD_PORT_http}"]
+   }
+   resources {
+     cpu    = 100
+     memory = 64
+   }
+ }
+```
+
+2) **Plan** (optional) and **run** the update:
+
+```bash
+nomad job plan demos/web.nomad
+nomad job run demos/web.nomad
+```
+
+3) **Watch** the deployment roll (one new alloc becomes healthy, then replaces the old one):
+
+```bash
+# CLI
+nomad job deployment watch -job web
+
+# or in the UI: http://127.0.0.1:4646/ui/jobs/web
+```
+
+4) **Verify** the new version is live:
+
+```bash
+PORT=$(curl -s "http://127.0.0.1:8500/v1/health/service/web?passing"   -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" | jq -r '.[0].Service.Port'])
+
+curl -s "http://127.0.0.1:${PORT}/"
+# should return: v2
+```
+
+> Notes  
+> • The job uses a **dynamic port**; Nomad exposes it via `${NOMAD_PORT_http}`.  
+> • If `python3` isn’t available on your host, swap the command for another simple server, e.g.:  
+>   `ruby -run -e httpd . -p ${NOMAD_PORT_http}` or `busybox httpd -f -p ${NOMAD_PORT_http}`.  
+> • With `count = 1` and the `update` stanza, Nomad still performs a rolling replacement (blue/green-style) to keep the service healthy.
+
 
 ### 2) Consul KV → env templating with restart-on-change
 

@@ -116,10 +116,7 @@ nomad job run demos/web.nomad
 
 Verify:
 ```bash
-PORT=$(curl -s "http://127.0.0.1:8500/v1/health/service/web?passing" \
-  -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" | jq -r '.[0].Service.Port')
-curl -s "http://127.0.0.1:${PORT}/"
-# -> v2
+nomad job status web
 ```
 
 ### 2) Consul KV → env templating with restart-on-change

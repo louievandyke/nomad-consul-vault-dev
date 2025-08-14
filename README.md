@@ -91,6 +91,47 @@ curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
 nomad job run demos/kv-watcher.nomad
 ```
 
+#### Validation
+
+```bash
+# 1) Confirm the KV value you wrote (raw)
+curl -s -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
+  http://127.0.0.1:8500/v1/kv/app/message?raw
+
+# 2) Get the running allocation ID for the job
+ALLOC=$(nomad job allocs -json kv-watcher \
+  | jq -r 'map(select(.ClientStatus=="running")) | .[0].ID'); echo "$ALLOC"
+
+# 3) Restart count derived from task events (Nomad 1.10+)
+nomad alloc status -json "$ALLOC" \
+  | jq '[.TaskStates["watcher"].Events[] | select(.Type=="Restarting")] | length'
+
+# 4) Show recent restart-related events
+nomad alloc status -json "$ALLOC" \
+  | jq -r '.TaskStates["watcher"].Events[]
+           | select(.Type=="Restart Signaled" or .Type=="Restarting")
+           | "\(.Time)  \(.Type)  \(.Message)"' | tail -n 10
+
+# 5) Inspect the rendered env file inside the allocation
+nomad alloc fs cat "$ALLOC" local/env
+```
+
+
+**Watch live (optional):**
+
+```bash
+# Terminal A: stream task logs
+ALLOC=$(nomad job allocs -json kv-watcher | jq -r '.[0].ID')
+nomad alloc logs -f "$ALLOC" watcher
+
+# Terminal B: update the KV key; Terminal A will pause/restart and print the new MESSAGE
+curl -s -X PUT -H "X-Consul-Token: $CONSUL_HTTP_TOKEN" \
+  --data 'Hello for the third time 🚀' \
+  http://127.0.0.1:8500/v1/kv/app/message
+```
+
+
+
 Change the value and watch the task restart with the new env:
 
 ```bash

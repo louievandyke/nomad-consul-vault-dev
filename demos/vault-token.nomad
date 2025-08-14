@@ -7,7 +7,14 @@ job "vault-token" {
 
       config {
         command = "bash"
-        args    = ["-c", "echo VAULT_TOKEN prefix: ${VAULT_TOKEN:0:8}; curl -s -H \"X-Vault-Token: $VAULT_TOKEN\" $VAULT_ADDR/v1/auth/token/lookup-self || true; sleep 60"]
+        args = [
+          "-c",
+          <<-EOT
+            echo "VAULT_TOKEN prefix: $(printf '%s' "$VAULT_TOKEN" | cut -c1-8)"
+            curl -s -H "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/auth/token/lookup-self" || true
+            sleep 60
+          EOT
+        ]
       }
 
       template {

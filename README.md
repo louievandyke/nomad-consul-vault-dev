@@ -112,7 +112,6 @@ Re-run:
 ```bash
 nomad job plan demos/web.nomad
 nomad job run demos/web.nomad
-nomad job deployment watch -job web
 ```
 
 Verify:

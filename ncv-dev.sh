@@ -44,12 +44,12 @@ require_or_prompt() { local name="$1" current="$2" default="$3" outvar="$4"; loc
 pause() { read -r -p $'\n⌛️ Press any key to continue...' -n1 -s || true; echo; }
 log_head() { local f="$1"; local n="${2:-100}"; [[ -f "$f" ]] && { echo -e "\n===== tail -n $n $f ====="; tail -n "$n" "$f"; } || true; }
 wait_for_url() { local url="$1" name="$2"; local timeout="${3:-$HEALTH_TIMEOUT}"; local i=0; echo -n "📝 Waiting for ${name} to start up..."; while ! curl -s "$url" >/dev/null; do echo -n .; sleep 1; i=$((i+1)); if $STREAM_LOGS; then case "$name" in Nomad) tail -n 2 nomad.log 2>/dev/null || true;; Vault) tail -n 2 vault.log 2>/dev/null || true;; Consul) tail -n 2 consul.log 2>/dev/null || true;; esac; fi; if [[ $i -ge $timeout ]]; then echo -e "\n❌ Timed out waiting for ${name}."; log_head consul.log 200; log_head vault.log 200; log_head nomad.log 200; exit 1; fi; done; echo; }
-check_command_success() { if [[ $? -ne 0 ]]; then echo "❌ Error occurred"; tail -n 30 nomad.log 2>/dev/null || true; exit 1; fi; }
+check_command_success() { if [[ $? -ne 0 ]]; then echo "Error occurred"; tail -n 30 nomad.log 2>/dev/null || true; exit 1; fi; }
 cleanup() {
   set +e
   trap - EXIT INT TERM
   echo -e "
-✨ Cleaning up..."
+ Cleaning up..."
 
   # 1) Nuke all child processes fast (don’t rely on CLIs)
   if command -v pkill >/dev/null 2>&1; then
@@ -109,12 +109,12 @@ require_or_prompt "Nomad" "$NOMAD_VERSION" "$DEFAULT_NOMAD_VERSION" NOMAD_VERSIO
 require_or_prompt "Consul" "$CONSUL_VERSION" "$DEFAULT_CONSUL_VERSION" CONSUL_VERSION
 require_or_prompt "Vault" "$VAULT_VERSION" "$DEFAULT_VAULT_VERSION" VAULT_VERSION
 
-echo "📦 Versions:"; echo "  Nomad : $NOMAD_VERSION"; echo "  Consul: $CONSUL_VERSION"; echo "  Vault : $VAULT_VERSION"
+echo "Versions:"; echo "  Nomad : $NOMAD_VERSION"; echo "  Consul: $CONSUL_VERSION"; echo "  Vault : $VAULT_VERSION"
 
 myOS="$(uname -s | tr '[:upper:]' '[:lower:]')"; myUnameArch="$(uname -m)"; case "$myUnameArch" in x86_64) myArch="amd64" ;; aarch64|arm64) myArch="arm64" ;; *) echo "Unsupported arch"; exit 1 ;; esac
 hc_zip_url() { echo "https://releases.hashicorp.com/$1/$2/$1_$2_${myOS}_${myArch}.zip"; }
-check_url() { curl -sIf "$1" >/dev/null || { echo "❌ URL not found: $1"; return 1; }; }
-if $RUN_CHECK; then check_url "$(hc_zip_url nomad "$NOMAD_VERSION")"; check_url "$(hc_zip_url consul "$CONSUL_VERSION")"; check_url "$(hc_zip_url vault "$VAULT_VERSION")"; echo "✅ All URLs good."; fi
+check_url() { curl -sIf "$1" >/dev/null || { echo "URL not found: $1"; return 1; }; }
+if $RUN_CHECK; then check_url "$(hc_zip_url nomad "$NOMAD_VERSION")"; check_url "$(hc_zip_url consul "$CONSUL_VERSION")"; check_url "$(hc_zip_url vault "$VAULT_VERSION")"; echo "All URLs good."; fi
 
 # Choose a non-symlink temp root and canonicalize the path
 TMPROOT="/tmp"
@@ -144,7 +144,7 @@ acl {
 EOF
 ./consul agent -dev -config-file=consul.hcl > consul.log 2>&1 & consulPID=$!; wait_for_url "http://127.0.0.1:8500/v1/status/leader" "Consul"; CONSUL_TOKEN="$(./consul acl bootstrap | awk '/SecretID:/ {print $2}')"; export CONSUL_HTTP_TOKEN="$CONSUL_TOKEN"
 
-echo "🚦 Starting Vault..."; cat > vault-config.hcl <<EOF
+echo "Starting Vault..."; cat > vault-config.hcl <<EOF
 storage "consul" {
   address = "127.0.0.1:8500"
   path    = "vault/"
@@ -242,13 +242,13 @@ export CONSUL_HTTP_TOKEN="$CONSUL_HTTP_TOKEN"
 export VAULT_TOKEN="$VAULT_TOKEN"
 EOF
 
-echo "📄 Wrote summary to: $SUMMARY_FILE (auto-removed on cleanup)"
-echo "📄 Wrote env exports to: $ENV_FILE (auto-removed on cleanup)"
+echo "Wrote summary to: $SUMMARY_FILE (auto-removed on cleanup)"
+echo "Wrote env exports to: $ENV_FILE (auto-removed on cleanup)"
 
 if [[ -n "$ENV_EXPORT_PATH" ]]; then
   mkdir -p "$(dirname "$ENV_EXPORT_PATH")" 2>/dev/null || true
   cp -f "$ENV_FILE" "$ENV_EXPORT_PATH"
-  echo "📦 Persisted env exports to: $ENV_EXPORT_PATH (safe to source later)"
+  echo "Persisted env exports to: $ENV_EXPORT_PATH (safe to source later)"
 fi
 
 pause

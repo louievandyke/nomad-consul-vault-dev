@@ -26,13 +26,14 @@ HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"
 
 usage() {
   cat <<USAGE
-Usage: $(basename "$0") [--nomad X.Y.Z] [--consul X.Y.Z] [--vault X.Y.Z] [--non-interactive] [--check] [--stream-logs] [--no-example]
+Usage: $(basename "$0") [--nomad X.Y.Z] [--consul X.Y.Z] [--vault X.Y.Z] [--non-interactive] [--check] [--stream-logs] [--no-example] [--env-out PATH]
 
 Flags:
   --non-interactive  Fail if any required version is unset (do not prompt)
   --check            Validate that release URLs exist before downloading
   --stream-logs      Stream logs while waiting for health checks
   --no-example       Skip running the example Nomad job
+  --env-out PATH     Also write a copy of stack.env to PATH (not cleaned up)
   -h, --help         Show this help and exit
 USAGE
 }
@@ -79,8 +80,30 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+ENV_EXPORT_PATH=""
 NOMAD_VERSION="${NOMAD_VERSION:-}"; CONSUL_VERSION="${CONSUL_VERSION:-}"; VAULT_VERSION="${VAULT_VERSION:-}"
-while [[ $# -gt 0 ]]; do case "$1" in -h|--help) usage; exit 0 ;; --nomad) NOMAD_VERSION="$2"; shift 2 ;; --consul) CONSUL_VERSION="$2"; shift 2 ;; --vault) VAULT_VERSION="$2"; shift 2 ;; --non-interactive) NON_INTERACTIVE=true; shift ;; --check) RUN_CHECK=true; shift ;; --stream-logs) STREAM_LOGS=true; shift ;; --no-example) NO_EXAMPLE=true; shift ;; *) echo "Unknown arg: $1"; usage; exit 1 ;; esac; done
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --nomad) NOMAD_VERSION="$2"; shift 2 ;;
+    --consul) CONSUL_VERSION="$2"; shift 2 ;;
+    --vault) VAULT_VERSION="$2"; shift 2 ;;
+    --non-interactive) NON_INTERACTIVE=true; shift ;;
+    --check) RUN_CHECK=true; shift ;;
+    --stream-logs) STREAM_LOGS=true; shift ;;
+    --no-example) NO_EXAMPLE=true; shift ;;
+    --env-out) ENV_EXPORT_PATH="$2"; shift 2 ;;   # <— new
+    *) echo "Unknown arg: $1"; usage; exit 1 ;;
+  esac
+done
+
+# If a relative path was given, anchor it to where you launched the script
+if [[ -n "$ENV_EXPORT_PATH" && "$ENV_EXPORT_PATH" != /* ]]; then
+  ENV_EXPORT_PATH="$ORIG_PWD/$ENV_EXPORT_PATH"
+fi
+
+
 
 require_or_prompt "Nomad" "$NOMAD_VERSION" "$DEFAULT_NOMAD_VERSION" NOMAD_VERSION
 require_or_prompt "Consul" "$CONSUL_VERSION" "$DEFAULT_CONSUL_VERSION" CONSUL_VERSION
@@ -93,7 +116,17 @@ hc_zip_url() { echo "https://releases.hashicorp.com/$1/$2/$1_$2_${myOS}_${myArch
 check_url() { curl -sIf "$1" >/dev/null || { echo "❌ URL not found: $1"; return 1; }; }
 if $RUN_CHECK; then check_url "$(hc_zip_url nomad "$NOMAD_VERSION")"; check_url "$(hc_zip_url consul "$CONSUL_VERSION")"; check_url "$(hc_zip_url vault "$VAULT_VERSION")"; echo "✅ All URLs good."; fi
 
-TMPDIR="$(mktemp -d "/tmp/$(basename "$0").XXXXXX")"; echo "📂 Using $TMPDIR..."; cd "$TMPDIR"
+# Choose a non-symlink temp root and canonicalize the path
+TMPROOT="/tmp"
+if [[ "$myOS" == "darwin" ]]; then
+  TMPROOT="/private/tmp"
+fi
+
+TMPDIR="$(mktemp -d "${TMPROOT}/$(basename "$0").XXXXXX")"
+cd "$TMPDIR"
+TMPDIR="$(pwd -P)"   # canonical, no symlinks
+echo "📂 Using $TMPDIR..."
+
 fetch_hc() { local name="$1" ver="$2"; echo "Fetching ${name} v${ver}..."; curl -sSL "$(hc_zip_url "$name" "$ver")" -o "${name}.zip"; unzip -o "${name}.zip" >/dev/null; rm -f "${name}.zip"; chmod +x "$name"; }
 fetch_hc nomad "$NOMAD_VERSION"; fetch_hc consul "$CONSUL_VERSION"; fetch_hc vault "$VAULT_VERSION"
 
@@ -187,4 +220,35 @@ EOF
   ./nomad job run example.nomad || true; ./nomad status example || true; allocID="$(./nomad alloc status -t '{{range .}}{{if eq .JobID "example"}}{{printf "%s\n" .ID}}{{end}}{{end}}' 2>/dev/null | head -n1 || true)"; if [[ -n "$allocID" ]]; then echo "==> Tailing logs for alloc $allocID (task: test)"; ./nomad alloc logs "$allocID" test 2>/dev/null || true; fi
 fi
 
-echo -e "\nGo have fun with Nomad, Consul, and Vault!"; echo "===================="; echo "Directory: $TMPDIR"; echo "Vault Root Token: $VAULT_TOKEN"; echo "Vault Unseal Key: $VAULT_UNSEAL_KEY"; echo "Consul Bootstrap Token: $CONSUL_HTTP_TOKEN"; echo "Nomad Bootstrap Token: $NOMAD_TOKEN"; pause
+SUMMARY_FILE="$TMPDIR/stack-info.txt"
+ENV_FILE="$TMPDIR/stack.env"
+
+{
+  echo
+  echo "Go have fun with Nomad, Consul, and Vault!"
+  echo "===================="
+  echo "Directory: $TMPDIR"
+  echo "Vault Root Token: $VAULT_TOKEN"
+  echo "Vault Unseal Key: $VAULT_UNSEAL_KEY"
+  echo "Consul Bootstrap Token: $CONSUL_HTTP_TOKEN"
+  echo "Nomad Bootstrap Token: $NOMAD_TOKEN"
+} | tee "$SUMMARY_FILE"
+
+cat > "$ENV_FILE" <<EOF
+export NOMAD_ADDR="http://127.0.0.1:4646"
+export VAULT_ADDR="http://127.0.0.1:8200"
+export NOMAD_TOKEN="$NOMAD_TOKEN"
+export CONSUL_HTTP_TOKEN="$CONSUL_HTTP_TOKEN"
+export VAULT_TOKEN="$VAULT_TOKEN"
+EOF
+
+echo "📄 Wrote summary to: $SUMMARY_FILE (auto-removed on cleanup)"
+echo "📄 Wrote env exports to: $ENV_FILE (auto-removed on cleanup)"
+
+if [[ -n "$ENV_EXPORT_PATH" ]]; then
+  mkdir -p "$(dirname "$ENV_EXPORT_PATH")" 2>/dev/null || true
+  cp -f "$ENV_FILE" "$ENV_EXPORT_PATH"
+  echo "📦 Persisted env exports to: $ENV_EXPORT_PATH (safe to source later)"
+fi
+
+pause

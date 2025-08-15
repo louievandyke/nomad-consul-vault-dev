@@ -178,7 +178,6 @@ The task reveals a short-lived Vault token and calls `auth/token/lookup-self` to
 ### 4) Periodic batch (cron) job
 ```bash
 nomad job run demos/cron-hello.nomad
-nomad job history cron-hello
 ```
 
 ### Cleanup

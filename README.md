@@ -170,7 +170,7 @@ nomad alloc status -json "$ALLOC" \
 ### 3) Vault Workload Identity: token injection
 ```bash
 nomad job run demos/vault-token.nomad
-nomad alloc logs -stderr -job vault-token
+nomad alloc logs -stdout -job vault-token
 ```
 
 The task reveals a short-lived Vault token and calls `auth/token/lookup-self` to prove it.

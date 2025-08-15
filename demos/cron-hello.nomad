@@ -3,16 +3,21 @@ job "cron-hello" {
   type = "batch"
 
   periodic {
-    cron             = "@every 30s"
+    crons = ["*/30 * * * * *"]       # every 30s (seconds field first)
+    #time_zone = "America/Los_Angeles" # optional; computes schedule in your TZ (default is UTC)
     prohibit_overlap = true
   }
 
   group "g" {
-    task "say" {
+    task "hello" {
       driver = "raw_exec"
       config {
         command = "bash"
-        args    = ["-c", "echo Hello from $(hostname) at $(date)"]
+        args    = ["-c", "echo hello $(date) | tee -a local/out.log"]
+      }
+      resources {
+        cpu = 50
+        memory = 64
       }
     }
   }

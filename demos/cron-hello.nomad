@@ -3,7 +3,7 @@ job "cron-hello" {
   type = "batch"
 
   periodic {
-    crons = ["*/30 * * * * *"]       # every 30s (seconds field first)
+    crons = ["*/1 * * * * *"]       # every 30s (seconds field first)
     #time_zone = "America/Los_Angeles" # optional; computes schedule in your TZ (default is UTC)
     prohibit_overlap = true
   }

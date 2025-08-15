@@ -207,18 +207,3 @@ nomad job stop -purge web kv-watcher vault-token cron-hello
 brew install shellcheck
 shellcheck ncv-dev.sh
 ```
-
-GitHub Actions:
-```yaml
-name: shellcheck
-on: [push, pull_request]
-jobs:
-  shellcheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - name: Lint
-        run: shellcheck ncv-dev.sh
-```

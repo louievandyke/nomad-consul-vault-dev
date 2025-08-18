@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# muy_refactor.sh — macOS-friendly dev stack launcher for Nomad + Consul + Vault
+# ncv-dev.sh — macOS-friendly dev stack launcher for Nomad + Consul + Vault
 # Features:
 # - Choose versions via env vars or flags; prompts if missing
 # - --non-interactive to fail when versions are unset

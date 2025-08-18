@@ -132,7 +132,7 @@ fetch_hc nomad "$NOMAD_VERSION"; fetch_hc consul "$CONSUL_VERSION"; fetch_hc vau
 
 unset NOMAD_ADDR NOMAD_TOKEN CONSUL_HTTP_TOKEN VAULT_TOKEN
 
-echo "🚦 Starting Consul..."; cat > consul.hcl <<EOF
+echo "Starting Consul..."; cat > consul.hcl <<EOF
 datacenter = "dc1"
 data_dir   = "$TMPDIR/consul-data"
 

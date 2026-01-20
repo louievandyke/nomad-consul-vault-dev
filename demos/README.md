@@ -83,10 +83,10 @@ Test the web service:
 
 ```bash
 # Get the allocation ID
-ALLOC=$(nomad job status -short web | grep running | awk '{print $1}' | head -1)
+ALLOC=$(nomad job status web | grep -A 10 "Allocations" | grep running | awk '{print $1}' | head -1)
 
 # Get the port
-PORT=$(nomad alloc status $ALLOC | grep "http:" | awk '{print $3}' | cut -d'=' -f2)
+PORT=$(nomad alloc status $ALLOC | grep "*http" | awk '{print $3}' | cut -d':' -f2)
 
 # Test the endpoint
 curl http://127.0.0.1:$PORT
